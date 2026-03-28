@@ -164,12 +164,16 @@ export function analyzeNetwork(params: {
   vpnScore = Math.min(10, Math.max(0, vpnScore));
   anonymityScore = Math.min(10, Math.max(1, anonymityScore));
 
-  const detectedByHeuristics =
-    strongVpnSignal ||
-    (strongHostingSignal && (params.timezoneMismatch || params.leakRisk));
+  const detectedByHeuristics = strongVpnSignal;
 
   if (!detectedByHeuristics && !flags.length) {
     flags.push("Явных VPN-признаков не обнаружено.");
+  }
+
+  if (!strongVpnSignal && (strongHostingSignal || params.timezoneMismatch || params.leakRisk)) {
+    recommendations.unshift(
+      "Есть косвенные сетевые признаки риска, но прямого подтверждения VPN по IP-базе нет.",
+    );
   }
 
   if (!recommendations.length) {
