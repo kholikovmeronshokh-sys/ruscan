@@ -32,6 +32,9 @@ const RESIDENTIAL_HINTS = [
   "fiber",
   "broadband",
   "ftth",
+  "telecom",
+  "communications",
+  "media",
 ];
 
 export function detectIpVersion(ip?: string): ReportResponse["ipVersion"] {
@@ -108,7 +111,7 @@ export function analyzeNetwork(params: {
 }) {
   const flags: string[] = [];
   const recommendations: string[] = [];
-  let vpnScore = 2;
+  let vpnScore = 1;
   let anonymityScore = 7;
 
   const joinedProvider = `${params.isp} ${params.org} ${params.asName} ${params.asType}`.toLowerCase();
@@ -118,25 +121,17 @@ export function analyzeNetwork(params: {
   const looksResidential = RESIDENTIAL_HINTS.some((item) => joinedProvider.includes(item));
 
   const strongVpnSignal = Boolean(privacy?.vpn || privacy?.proxy || privacy?.tor || privacy?.relay);
-  const hostingSignal = Boolean(privacy?.hosting || hasKeywordMatch);
-  const weakSuspicionCount = [
-    params.timezoneMismatch,
-    params.leakRisk,
-    hostingSignal && !looksResidential,
-  ].filter(Boolean).length;
+  const strongHostingSignal = Boolean(privacy?.hosting || (hasKeywordMatch && !looksResidential));
 
   if (strongVpnSignal) {
-    vpnScore += 6;
+    vpnScore += 7;
     anonymityScore += 2;
     flags.push("IP-база пометила адрес как VPN, proxy, relay или Tor.");
   }
 
-  if (privacy?.hosting) {
-    vpnScore += 2;
-    flags.push("IP отмечен как hosting-инфраструктура.");
-  } else if (hasKeywordMatch && !looksResidential) {
-    vpnScore += 2;
-    flags.push("Провайдер похож на дата-центр, хостинг или VPN-инфраструктуру.");
+  if (strongHostingSignal) {
+    vpnScore += 3;
+    flags.push("IP или провайдер похожи на hosting, дата-центр или VPN-инфраструктуру.");
   }
 
   if (params.timezoneMismatch) {
@@ -170,7 +165,8 @@ export function analyzeNetwork(params: {
   anonymityScore = Math.min(10, Math.max(1, anonymityScore));
 
   const detectedByHeuristics =
-    strongVpnSignal || ((privacy?.hosting || hasKeywordMatch) && weakSuspicionCount >= 2);
+    strongVpnSignal ||
+    (strongHostingSignal && (params.timezoneMismatch || params.leakRisk));
 
   if (!detectedByHeuristics && !flags.length) {
     flags.push("Явных VPN-признаков не обнаружено.");
