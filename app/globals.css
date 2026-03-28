@@ -1,0 +1,45 @@
+:root {
+  --bg: #eef6ff;
+  --bg-strong: #d7ebff;
+  --card: rgba(255, 255, 255, 0.84);
+  --card-solid: #ffffff;
+  --text: #0d2340;
+  --muted: #5b7697;
+  --line: rgba(44, 110, 201, 0.14);
+  --primary: #1677ff;
+  --primary-strong: #0b57d0;
+  --accent: #5cbcff;
+  --danger: #dc3e57;
+  --success: #16986f;
+  --warning: #c88013;
+  --shadow: 0 24px 80px rgba(16, 84, 163, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(92, 188, 255, 0.35), transparent 32%),
+    radial-gradient(circle at 85% 15%, rgba(22, 119, 255, 0.16), transparent 24%),
+    linear-gradient(180deg, #f7fbff 0%, var(--bg) 55%, #f3f9ff 100%);
+  font-family: "Segoe UI", "Arial", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}

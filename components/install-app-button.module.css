@@ -1,0 +1,38 @@
+.wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.button,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
+  font-weight: 700;
+}
+
+.button {
+  border: 0;
+  color: white;
+  background: linear-gradient(135deg, #0c8ce9, #35b4ff);
+  cursor: pointer;
+}
+
+.badge {
+  color: #0b57d0;
+  background: rgba(22, 119, 255, 0.1);
+}
+
+.help {
+  max-width: 320px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: #31557e;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(22, 119, 255, 0.12);
+  line-height: 1.55;
+  box-shadow: 0 12px 30px rgba(16, 84, 163, 0.1);
+}

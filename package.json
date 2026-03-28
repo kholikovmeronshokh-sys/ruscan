@@ -1,0 +1,26 @@
+{
+  "name": "russcan-vpn-checker",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "20.x || 22.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "preview": "next build && next start -p 3001",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.25",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.14",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "typescript": "5.8.2"
+  }
+}
