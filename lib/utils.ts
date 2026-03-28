@@ -24,6 +24,16 @@ const VPN_KEYWORDS = [
   "contabo",
 ];
 
+const RESIDENTIAL_HINTS = [
+  "cable/dsl/isp",
+  "isp",
+  "mobile",
+  "lte",
+  "fiber",
+  "broadband",
+  "ftth",
+];
+
 export function detectIpVersion(ip?: string): ReportResponse["ipVersion"] {
   if (!ip) return "Не определено";
   if (ip.includes(":")) return "IPv6";
@@ -67,8 +77,10 @@ export function classifyProviderType(input: {
   if (input.privacy?.proxy) return "Proxy";
   if (input.privacy?.vpn) return "VPN";
   if (input.privacy?.hosting) return "Hosting";
+  if (RESIDENTIAL_HINTS.some((item) => haystack.includes(item))) {
+    return "Резидентский или обычный провайдер";
+  }
   if (VPN_KEYWORDS.some((item) => haystack.includes(item))) return "Hosting/VPN";
-  if (haystack.includes("mobile") || haystack.includes("lte")) return "Мобильная сеть";
   return "Резидентский или обычный провайдер";
 }
 
@@ -96,35 +108,43 @@ export function analyzeNetwork(params: {
 }) {
   const flags: string[] = [];
   const recommendations: string[] = [];
-  let vpnScore = 3;
+  let vpnScore = 2;
   let anonymityScore = 7;
 
   const joinedProvider = `${params.isp} ${params.org} ${params.asName} ${params.asType}`.toLowerCase();
   const privacy = params.ipinfo?.privacy;
 
-  if (VPN_KEYWORDS.some((item) => joinedProvider.includes(item))) {
-    vpnScore += 3;
-    flags.push("Провайдер похож на дата-центр, hosting или VPN-инфраструктуру.");
-  }
+  const hasKeywordMatch = VPN_KEYWORDS.some((item) => joinedProvider.includes(item));
+  const looksResidential = RESIDENTIAL_HINTS.some((item) => joinedProvider.includes(item));
 
-  if (privacy?.vpn || privacy?.proxy || privacy?.tor || privacy?.relay) {
-    vpnScore += 4;
+  const strongVpnSignal = Boolean(privacy?.vpn || privacy?.proxy || privacy?.tor || privacy?.relay);
+  const hostingSignal = Boolean(privacy?.hosting || hasKeywordMatch);
+  const weakSuspicionCount = [
+    params.timezoneMismatch,
+    params.leakRisk,
+    hostingSignal && !looksResidential,
+  ].filter(Boolean).length;
+
+  if (strongVpnSignal) {
+    vpnScore += 6;
     anonymityScore += 2;
-    flags.push("IPinfo сообщил о VPN, proxy, relay или Tor-признаках.");
+    flags.push("IP-база пометила адрес как VPN, proxy, relay или Tor.");
   }
 
   if (privacy?.hosting) {
     vpnScore += 2;
     flags.push("IP отмечен как hosting-инфраструктура.");
+  } else if (hasKeywordMatch && !looksResidential) {
+    vpnScore += 2;
+    flags.push("Провайдер похож на дата-центр, хостинг или VPN-инфраструктуру.");
   }
 
   if (params.timezoneMismatch) {
-    vpnScore += 2;
+    vpnScore += 1;
     flags.push("Часовой пояс браузера отличается от часового пояса IP.");
   }
 
   if (params.leakRisk) {
-    vpnScore += 1;
     anonymityScore -= 2;
     flags.push("WebRTC может раскрывать дополнительный IP.");
     recommendations.push("Отключите или ограничьте WebRTC в браузере или VPN-клиенте.");
@@ -134,8 +154,8 @@ export function analyzeNetwork(params: {
     recommendations.push("Сеть отвечает медленно: проверьте сервер VPN или качество канала.");
   }
 
-  if (joinedProvider.includes("mobile") || joinedProvider.includes("lte")) {
-    vpnScore = Math.max(0, vpnScore - 1);
+  if (looksResidential && !strongVpnSignal && !privacy?.hosting) {
+    vpnScore = Math.min(vpnScore, 3);
   }
 
   if (
@@ -149,7 +169,10 @@ export function analyzeNetwork(params: {
   vpnScore = Math.min(10, Math.max(0, vpnScore));
   anonymityScore = Math.min(10, Math.max(1, anonymityScore));
 
-  if (vpnScore < 4 && !flags.length) {
+  const detectedByHeuristics =
+    strongVpnSignal || ((privacy?.hosting || hasKeywordMatch) && weakSuspicionCount >= 2);
+
+  if (!detectedByHeuristics && !flags.length) {
     flags.push("Явных VPN-признаков не обнаружено.");
   }
 
@@ -157,8 +180,9 @@ export function analyzeNetwork(params: {
     recommendations.push("Серьезных сетевых аномалий не найдено.");
   }
 
-  const status: ReportResponse["status"] =
-    vpnScore >= 6 ? "VPN обнаружен" : "VPN не обнаружен";
+  const status: ReportResponse["status"] = detectedByHeuristics
+    ? "VPN обнаружен"
+    : "VPN не обнаружен";
 
   return {
     status,
