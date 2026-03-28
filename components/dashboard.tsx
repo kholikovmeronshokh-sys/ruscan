@@ -340,12 +340,16 @@ export function Dashboard() {
   }, []);
 
   const statusTone = useMemo(() => {
-    if (!report) return styles.neutral;
+    if (!report || loading || leakScanState === "running" || !clientMetrics) {
+      return styles.neutral;
+    }
     return report.status === "VPN обнаружен" ? styles.danger : styles.success;
-  }, [report]);
+  }, [report, loading, leakScanState, clientMetrics]);
 
   const riskTone = useMemo(() => {
-    if (!report) return styles.neutral;
+    if (!report || loading || leakScanState === "running" || !clientMetrics) {
+      return styles.neutral;
+    }
     if (report.riskLevel === "Критический" || report.riskLevel === "Высокий") {
       return styles.danger;
     }
@@ -353,7 +357,14 @@ export function Dashboard() {
       return styles.neutral;
     }
     return styles.success;
-  }, [report]);
+  }, [report, loading, leakScanState, clientMetrics]);
+
+  const deepAnalyzing = loading || leakScanState === "running" || !report || !clientMetrics;
+  const visibleStatus = deepAnalyzing ? "Идет глубокий анализ..." : report.status;
+  const visibleVpnScore = deepAnalyzing ? "-" : String(report?.vpnScore ?? "-");
+  const visibleAnonymityScore = deepAnalyzing ? "-" : String(report?.anonymityScore ?? "-");
+  const visibleSpeedScore = deepAnalyzing ? "-" : String(report?.speedScore ?? "-");
+  const visibleRiskLevel = deepAnalyzing ? "..." : report?.riskLevel || "Нет данных";
 
   return (
     <main className={styles.page}>
@@ -387,27 +398,27 @@ export function Dashboard() {
           <div className={styles.cardHeader}>
             <span>Статус сети</span>
             <span className={`${styles.status} ${statusTone}`}>
-              {loading ? "Быстрая проверка..." : report?.status || "Ошибка"}
+              {visibleStatus}
             </span>
           </div>
           <div className={styles.scoreRow}>
             <div>
-              <strong>{report?.vpnScore ?? "-"}/10</strong>
+              <strong>{visibleVpnScore}/10</strong>
               <span>VPN Score</span>
             </div>
             <div>
-              <strong>{report?.anonymityScore ?? "-"}/10</strong>
+              <strong>{visibleAnonymityScore}/10</strong>
               <span>Анонимность</span>
             </div>
             <div>
-              <strong>{report?.speedScore ?? "-"}/10</strong>
+              <strong>{visibleSpeedScore}/10</strong>
               <span>Скорость</span>
             </div>
           </div>
           <div className={styles.cardHeader}>
             <span>Уровень риска</span>
             <span className={`${styles.status} ${riskTone}`}>
-              {loading ? "..." : report?.riskLevel || "Нет данных"}
+              {visibleRiskLevel}
             </span>
           </div>
           <p className={styles.cardNote}>
