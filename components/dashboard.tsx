@@ -19,9 +19,13 @@ type ClientMetrics = {
 
 type NetworkInformationWithDownlink = {
   downlink?: number;
+  addEventListener?: (type: string, listener: EventListenerOrEventListenerObject) => void;
+  removeEventListener?: (type: string, listener: EventListenerOrEventListenerObject) => void;
 };
 
 type LeakScanState = "idle" | "running" | "done";
+
+const AUTO_REFRESH_MS = 5000;
 
 function getTimezoneOffsetLabel() {
   const minutes = -new Date().getTimezoneOffset();
@@ -179,7 +183,11 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leakScanState, setLeakScanState] = useState<LeakScanState>("idle");
+  const [liveStatus, setLiveStatus] = useState("Мониторинг отключен");
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const didLoadRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const latestIpRef = useRef<string>("");
   const telegramUrl =
     process.env.NEXT_PUBLIC_TELEGRAM_URL || "https://t.me/your_username";
 
@@ -191,10 +199,17 @@ export function Dashboard() {
     didLoadRef.current = true;
     let isMounted = true;
 
-    async function load() {
+    async function runFullScan(reason: string) {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+
       try {
-        setLoading(true);
+        if (isMounted && !report) {
+          setLoading(true);
+        }
+
         setError(null);
+        setLiveStatus(`Обновление: ${reason}`);
 
         const [latencyMs, publicIp] = await Promise.all([runPingTest(), getPublicIp()]);
 
@@ -223,10 +238,19 @@ export function Dashboard() {
 
         if (!isMounted) return;
 
+        const ipChanged = latestIpRef.current && latestIpRef.current !== publicIp;
+        latestIpRef.current = publicIp;
+
         setClientMetrics(baseMetrics);
         setReport(baseReport);
         setLoading(false);
         setLeakScanState("running");
+        setLastUpdated(new Date().toLocaleTimeString("ru-RU"));
+        setLiveStatus(
+          ipChanged
+            ? "IP изменился. Выполняю быстрый повторный анализ."
+            : "Живой мониторинг активен"
+        );
 
         const leakData = await runWebRtcScan(publicIp);
 
@@ -252,7 +276,12 @@ export function Dashboard() {
 
           if (isMounted) {
             setReport(refreshedReport);
+            setLastUpdated(new Date().toLocaleTimeString("ru-RU"));
           }
+        }
+
+        if (isMounted) {
+          setLiveStatus("Живой мониторинг активен");
         }
       } catch (requestError) {
         if (isMounted) {
@@ -263,14 +292,50 @@ export function Dashboard() {
           );
           setLoading(false);
           setLeakScanState("done");
+          setLiveStatus("Не удалось обновить данные");
         }
+      } finally {
+        inFlightRef.current = false;
       }
     }
 
-    void load();
+    void runFullScan("первичная загрузка");
+
+    const intervalId = window.setInterval(() => {
+      void runFullScan("автообновление");
+    }, AUTO_REFRESH_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void runFullScan("возврат во вкладку");
+      }
+    };
+
+    const onOnline = () => {
+      void runFullScan("интернет снова доступен");
+    };
+
+    const onFocus = () => {
+      void runFullScan("возврат в приложение");
+    };
+
+    const connection =
+      typeof navigator !== "undefined" && "connection" in navigator
+        ? (navigator.connection as NetworkInformationWithDownlink)
+        : undefined;
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("focus", onFocus);
+    connection?.addEventListener?.("change", onFocus);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("focus", onFocus);
+      connection?.removeEventListener?.("change", onFocus);
     };
   }, []);
 
@@ -346,7 +411,12 @@ export function Dashboard() {
             </span>
           </div>
           <p className={styles.cardNote}>
-            Основной отчет загружается сразу, а глубокая проверка WebRTC догружается фоном.
+            {liveStatus}. Последнее обновление: {lastUpdated || "еще не выполнено"}.
+          </p>
+          <p className={styles.cardNote}>
+            Важно: сайт умеет очень быстро замечать смену IP и сетевых признаков, но ни один
+            браузерный сервис не может гарантировать обнаружение абсолютно каждого VPN,
+            если его IP выглядит как обычная домашняя сеть.
           </p>
         </article>
 
